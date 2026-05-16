@@ -61,7 +61,7 @@ function addStatus(text, type = "info") {
 
 async function hashText(text) {
   const digest = await crypto.subtle.digest(
-    "SHA-256",
+    "SHA-512",
     new TextEncoder().encode(text),
   );
   return b64(digest);
@@ -81,7 +81,7 @@ function renderCryptoDetails(details) {
   const entries = [
     ["Direction", details.direction],
     ["Plaintext", details.plaintext],
-    ["SHA-256 hash", details.hash],
+    ["SHA-512 hash", details.hash],
     ["Sender signing key", details.senderSigningKey],
     ["Recipient encryption key", details.recipientEncryptionKey],
     ["JWT subject", details.jwtSubject],
@@ -180,7 +180,7 @@ async function generateUserProfile(username) {
       name: "RSA-PSS",
       modulusLength: 2048,
       publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256",
+      hash: "SHA-512",
     },
     true,
     ["sign", "verify"],
@@ -190,7 +190,7 @@ async function generateUserProfile(username) {
       name: "RSA-OAEP",
       modulusLength: 2048,
       publicExponent: new Uint8Array([1, 0, 1]),
-      hash: "SHA-256",
+      hash: "SHA-512",
     },
     true,
     ["encrypt", "decrypt"],
@@ -199,7 +199,7 @@ async function generateUserProfile(username) {
   const signingPriv = await crypto.subtle.exportKey("jwk", signing.privateKey);
   const encPub = await crypto.subtle.exportKey("jwk", wrapping.publicKey);
   const encPriv = await crypto.subtle.exportKey("jwk", wrapping.privateKey);
-  const jwtSecretRaw = crypto.getRandomValues(new Uint8Array(32));
+  const jwtSecretRaw = crypto.getRandomValues(new Uint8Array(64));
   return {
     signingPub,
     signingPriv,
@@ -210,14 +210,14 @@ async function generateUserProfile(username) {
 }
 
 async function createJWT(payload, secret) {
-  const header = { alg: "HS256", typ: "JWT" };
+  const header = { alg: "HS512", typ: "JWT" };
   const encodedHeader = toBase64Url(JSON.stringify(header));
   const encodedPayload = toBase64Url(JSON.stringify(payload));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
   const key = await crypto.subtle.importKey(
     "raw",
     fromB64(secret),
-    { name: "HMAC", hash: "SHA-256" },
+    { name: "HMAC", hash: "SHA-512" },
     false,
     ["sign"],
   );
@@ -237,7 +237,7 @@ async function verifyJWT(token, secret) {
   const key = await crypto.subtle.importKey(
     "raw",
     fromB64(secret),
-    { name: "HMAC", hash: "SHA-256" },
+    { name: "HMAC", hash: "SHA-512" },
     false,
     ["verify"],
   );
@@ -364,12 +364,12 @@ async function signMessage(senderPrivateKey, plaintext) {
   const signingPriv = await crypto.subtle.importKey(
     "jwk",
     senderPrivateKey,
-    { name: "RSA-PSS", hash: "SHA-256" },
+    { name: "RSA-PSS", hash: "SHA-512" },
     false,
     ["sign"],
   );
   const signature = await crypto.subtle.sign(
-    { name: "RSA-PSS", saltLength: 32 },
+    { name: "RSA-PSS", saltLength: 64 },
     signingPriv,
     new TextEncoder().encode(plaintext),
   );
@@ -380,7 +380,7 @@ async function decryptMessage(recipientPrivateKey, packet) {
   const priv = await crypto.subtle.importKey(
     "jwk",
     recipientPrivateKey,
-    { name: "RSA-OAEP", hash: "SHA-256" },
+    { name: "RSA-OAEP", hash: "SHA-512" },
     false,
     ["decrypt"],
   );
@@ -408,12 +408,12 @@ async function verifySignature(senderPublicKey, plaintext, signature) {
   const signingPub = await crypto.subtle.importKey(
     "jwk",
     senderPublicKey,
-    { name: "RSA-PSS", hash: "SHA-256" },
+    { name: "RSA-PSS", hash: "SHA-512" },
     false,
     ["verify"],
   );
   return crypto.subtle.verify(
-    { name: "RSA-PSS", saltLength: 32 },
+    { name: "RSA-PSS", saltLength: 64 },
     signingPub,
     fromB64(signature),
     new TextEncoder().encode(plaintext),
