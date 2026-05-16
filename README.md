@@ -1,4 +1,4 @@
-Crpto Chat — Local Crypto Proof Chat Demo
+Crypto Chat — Local Crypto Proof Chat Demo
 
 Overview
 --------
