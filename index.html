@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Crypto Chat</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <main>
+        <section id="start" class="page active">
+          <h1>SMS Chat</h1>
+          <p>Enter sender and receiver names to begin.</p>
+          <form id="startForm" class="start-form">
+            <label>Sender name<input name="senderName" placeholder="Sender"
+                required></label>
+            <label>Receiver name<input name="receiverName"
+                placeholder="Receiver" required></label>
+            <button type="submit">Start Chat</button>
+          </form>
+        </section>
+
+        <section id="chat" class="page">
+          <div class="chat-header">
+            <div><strong>Sender:</strong> <span
+                id="senderNameLabel"></span></div>
+            <div><strong>Receiver:</strong> <span
+                id="receiverNameLabel"></span></div>
+          </div>
+          <div class="status" id="statusMessage">JWT auth, RSA/AES encryption,
+            and local DB are enabled.</div>
+          <div class="activity-panel">
+            <h3>Proofs & Activity</h3>
+            <div id="activityList" class="activity-list">No activity yet.</div>
+          </div>
+          <div class="crypto-details" id="cryptoDetails">Click an activity entry
+            to view send/verification proof details.</div>
+          <div class="split-window">
+            <div class="pane sender-pane">
+              <h2>Sender</h2>
+              <div class="message-log" id="senderLog"></div>
+              <form id="senderForm" class="message-form">
+                <input id="senderMessage" placeholder="Send SMS to receiver"
+                  required>
+                <button type="submit">Send</button>
+              </form>
+            </div>
+            <div class="pane receiver-pane">
+              <h2>Receiver</h2>
+              <div class="message-log" id="receiverLog"></div>
+              <form id="receiverForm" class="message-form">
+                <input id="receiverMessage" placeholder="Send SMS to sender"
+                  required>
+                <button type="submit">Send</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
