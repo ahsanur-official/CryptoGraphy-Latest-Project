@@ -1,8 +1,8 @@
-Crpto Chat — Local Crypto Proof Chat Demo
+Crypto Chat — Local Crypto Proof Chat Demo
 
 Overview
 --------
-Crpto Chat is a small, browser-native demo that simulates an SMS-style sender/receiver chat and attaches cryptographic proof metadata to each message. It is designed as an educational showcase of the Web Crypto API (AES, RSA, RSA-PSS signatures), JWT-style authentication simulation, and a lightweight localStorage "database" for activity/proof inspection.
+Crypto Chat is a small, browser-native demo that simulates an SMS-style sender/receiver chat and attaches cryptographic proof metadata to each message. It is designed as an educational showcase of the Web Crypto API (AES, RSA, RSA-PSS signatures), JWT-style authentication simulation, and a lightweight localStorage "database" for activity/proof inspection.
 
 Key features
 ------------
