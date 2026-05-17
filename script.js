@@ -344,7 +344,7 @@ async function encryptMessage(recipientPublicKey, plaintext) {
   const recipientPub = await crypto.subtle.importKey(
     "jwk",
     recipientPublicKey,
-    { name: "RSA-OAEP", hash: "SHA-256" },
+    { name: "RSA-OAEP", hash: "SHA-512" },
     false,
     ["encrypt"],
   );
@@ -380,7 +380,7 @@ async function decryptMessage(recipientPrivateKey, packet) {
   const priv = await crypto.subtle.importKey(
     "jwk",
     recipientPrivateKey,
-    { name: "RSA-OAEP", hash: "SHA-512" },
+    { name: "RSA-OAEP", hash: "SHA-256" },
     false,
     ["decrypt"],
   );
@@ -594,16 +594,26 @@ senderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = document.getElementById("senderMessage").value.trim();
   if (!text) return;
-  await sendSecureMessage("sender", text);
-  event.target.reset();
+  try {
+    await sendSecureMessage("sender", text);
+    event.target.reset();
+  } catch (error) {
+    addStatus(`Error sending message: ${error.message}`, "error");
+    console.error("Send error:", error);
+  }
 });
 
 receiverForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = document.getElementById("receiverMessage").value.trim();
   if (!text) return;
-  await sendSecureMessage("receiver", text);
-  event.target.reset();
+  try {
+    await sendSecureMessage("receiver", text);
+    event.target.reset();
+  } catch (error) {
+    addStatus(`Error sending message: ${error.message}`, "error");
+    console.error("Send error:", error);
+  }
 });
 
 showView("start");
