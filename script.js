@@ -12,6 +12,12 @@ const logoutButton = document.getElementById("logoutButton");
 const statusEl = document.getElementById("statusMessage");
 const cryptoDetailsEl = document.getElementById("cryptoDetails");
 const activityListEl = document.getElementById("activityList");
+const openProofsBtn = document.getElementById("openProofsBtn");
+const proofsModal = document.getElementById("proofsModal");
+const closeProofsBtn = document.getElementById("closeProofsBtn");
+const proofsListEl = document.getElementById("proofsList");
+const proofsDetailEl = document.getElementById("proofsDetail");
+const exportAllProofsBtn = document.getElementById("exportAllProofsBtn");
 
 const USERS_KEY = "cc_users";
 const MESSAGES_KEY = "cc_messages";
@@ -44,6 +50,124 @@ let messages = [];
 
 function showView(id) {
   pages.forEach((page) => page.classList.toggle("active", page.id === id));
+}
+
+/* Proofs modal helpers */
+function openProofsModal() {
+  renderProofsModalList();
+  if (proofsModal) proofsModal.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeProofsModal() {
+  if (proofsModal) proofsModal.hidden = true;
+  document.body.style.overflow = "";
+}
+
+function renderProofsModalList() {
+  if (!proofsListEl) return;
+  const proofs = getProofs();
+  if (!proofs.length) {
+    proofsListEl.innerHTML = '<div class="empty">No proofs recorded.</div>';
+    if (proofsDetailEl) proofsDetailEl.textContent = "No proof selected.";
+    return;
+  }
+  proofsListEl.innerHTML = "";
+  proofs.forEach((p) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "modal-item";
+    btn.innerHTML = `<strong>${p.type} • ${p.sender} → ${p.recipient}</strong><div class="muted">${formatTimestamp(p.ts)}</div>`;
+    btn.addEventListener("click", () => showProofDetailsInModal(p.id));
+    proofsListEl.appendChild(btn);
+  });
+}
+
+function showProofDetailsInModal(id) {
+  if (!proofsDetailEl) return;
+  const proofs = getProofs();
+  const p = proofs.find((x) => x.id === id);
+  if (!p) {
+    proofsDetailEl.textContent = "Proof not found.";
+    return;
+  }
+  proofsDetailEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:0.6rem">
+      <div>
+        <strong>Type:</strong> ${p.type}<br>
+        <strong>Sender:</strong> ${p.sender}<br>
+        <strong>Recipient:</strong> ${p.recipient}<br>
+        <strong>Timestamp:</strong> ${formatTimestamp(p.ts)}
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <button id="exportProofBtn" class="small-btn">Export</button>
+        <button id="deleteProofBtn" class="small-btn">Delete</button>
+      </div>
+    </div>
+    <hr style="margin:0.6rem 0;opacity:0.06" />
+    <strong>Plaintext:</strong>
+    <div class="code">${p.plaintext || ""}</div>
+    <strong>Hash:</strong>
+    <div class="code">${p.hash || ""}</div>
+    <strong>Ciphertext:</strong>
+    <div class="code">${p.ciphertext || ""}</div>
+    <strong>Signature:</strong>
+    <div class="code">${p.signature || ""}</div>
+    <div style="margin-top:0.6rem"><strong>Signature valid:</strong> ${p.signatureValid !== false}</div>
+  `;
+  // wire buttons
+  const exportProofBtn = document.getElementById("exportProofBtn");
+  const deleteProofBtn = document.getElementById("deleteProofBtn");
+  if (exportProofBtn) exportProofBtn.addEventListener("click", () => exportProof(p.id));
+  if (deleteProofBtn) deleteProofBtn.addEventListener("click", async () => {
+    if (!confirm("Delete this proof? This action cannot be undone.")) return;
+    await deleteProofById(p.id);
+    renderProofsModalList();
+    proofsDetailEl.textContent = "Proof deleted.";
+  });
+}
+
+function exportProof(id) {
+  const proofs = getProofs();
+  const p = proofs.find((x) => x.id === id);
+  if (!p) return;
+  const blob = new Blob([JSON.stringify(p, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `proof-${id}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportAllProofs() {
+  const proofs = getProofs();
+  const blob = new Blob([JSON.stringify(proofs, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `proofs-all-${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function deleteProofById(id) {
+  const current = getProofs();
+  const next = current.filter((p) => p.id !== id);
+  saveProofs(next);
+  // delete from firebase if enabled
+  try {
+    const db = await ensureFirebase();
+    if (db) {
+      await db.collection("proofs").doc(id).delete().catch(() => {});
+    }
+  } catch (e) {
+    console.warn("Failed deleting proof from firebase", e);
+  }
 }
 
 function setLogoutVisible(isVisible) {
@@ -235,6 +359,13 @@ function getProofs() {
 function saveProofs(list) {
   localStorage.setItem(PROOFS_KEY, JSON.stringify(list));
   void mirrorProofsToFirebase(list);
+  try {
+    if (typeof proofsModal !== "undefined" && proofsModal && !proofsModal.hidden) {
+      renderProofsModalList();
+    }
+  } catch (e) {
+    // ignore rendering errors
+  }
 }
 
 async function ensureFirebase() {
@@ -343,11 +474,25 @@ async function attachFirebaseListeners() {
       const current = getProofs();
       let changed = false;
       snapshot.docChanges().forEach((change) => {
-        if (change.type !== "added") return;
         const item = change.doc.data();
-        if (!current.some((entry) => entry.id === item.id)) {
-          current.push(item);
-          changed = true;
+        if (change.type === "added") {
+          if (!current.some((entry) => entry.id === item.id)) {
+            current.push(item);
+            changed = true;
+          }
+        } else if (change.type === "modified") {
+          const idx = current.findIndex((e) => e.id === item.id);
+          if (idx >= 0) {
+            current[idx] = item;
+            changed = true;
+          }
+        } else if (change.type === "removed") {
+          const next = current.filter((e) => e.id !== item.id);
+          if (next.length !== current.length) {
+            current.length = 0;
+            next.forEach((x) => current.push(x));
+            changed = true;
+          }
         }
       });
       if (changed) saveProofs(current);
@@ -841,3 +986,12 @@ initApp();
 logoutButton.addEventListener("click", () => {
   resetSessionView();
 });
+
+// Modal event wiring
+if (openProofsBtn) openProofsBtn.addEventListener("click", openProofsModal);
+if (closeProofsBtn) closeProofsBtn.addEventListener("click", closeProofsModal);
+if (proofsModal)
+  proofsModal.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal-backdrop")) closeProofsModal();
+  });
+if (exportAllProofsBtn) exportAllProofsBtn.addEventListener("click", exportAllProofs);

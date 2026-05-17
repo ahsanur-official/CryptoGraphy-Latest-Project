@@ -582,3 +582,63 @@ button:hover {
   padding: 0.6rem 0;
 }
 .site-header .header-inner { padding: 1rem 1.25rem; }
+
+/* Small utility button used in headers */
+.small-btn {
+  margin-left: 0.6rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  color: #e6eef8;
+}
+
+/* Modal for viewing proofs */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+}
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2,6,18,0.6);
+  backdrop-filter: blur(4px);
+}
+.modal-content {
+  position: relative;
+  width: min(1100px, 96%);
+  max-height: 86vh;
+  overflow: auto;
+  background: linear-gradient(180deg, rgba(6,8,20,0.98), rgba(12,14,28,0.96));
+  border: 1px solid rgba(124,58,237,0.08);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem 1.25rem;
+  z-index: 1201;
+  box-shadow: 0 30px 120px rgba(2,6,18,0.6);
+}
+.modal-close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+.modal-body { display: grid; grid-template-columns: 360px 1fr; gap: 1rem; margin-top: 0.8rem; }
+.modal-list { background: rgba(15,23,42,0.9); border-radius: 12px; padding: 0.6rem; max-height: 70vh; overflow:auto; }
+.modal-item { display:block; width:100%; text-align:left; padding:0.6rem 0.8rem; margin-bottom:0.45rem; border-radius:10px; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.02); color:#e6eef8; cursor:pointer; }
+.modal-item strong { display:block; color:#f8fafc; }
+.modal-item .muted { color:#bcd0ea; font-size:0.86rem; }
+.modal-detail { background: rgba(6,8,20,0.9); border-radius:12px; padding: 0.8rem; color:#e6eef8; max-height:70vh; overflow:auto; }
+.modal-detail .code { margin: 0.4rem 0; padding:0.6rem; background: rgba(255,255,255,0.03); border-radius:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; overflow-x:auto; }
+.modal-list .empty { color: #cbd5e1; padding: 0.6rem; }
+
+@media (max-width: 860px) {
+  .modal-body { grid-template-columns: 1fr; }
+}
