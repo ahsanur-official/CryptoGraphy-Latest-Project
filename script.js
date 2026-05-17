@@ -6,12 +6,33 @@ const senderLog = document.getElementById("senderLog");
 const receiverLog = document.getElementById("receiverLog");
 const senderNameLabel = document.getElementById("senderNameLabel");
 const receiverNameLabel = document.getElementById("receiverNameLabel");
+const senderPaneTitle = document.getElementById("senderPaneTitle");
+const receiverPaneTitle = document.getElementById("receiverPaneTitle");
+const logoutButton = document.getElementById("logoutButton");
 const statusEl = document.getElementById("statusMessage");
 const cryptoDetailsEl = document.getElementById("cryptoDetails");
 const activityListEl = document.getElementById("activityList");
 
 const USERS_KEY = "cc_users";
 const MESSAGES_KEY = "cc_messages";
+const PROOFS_KEY = "cc_proofs";
+const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
+  apiKey: "REPLACE_ME",
+  authDomain: "REPLACE_ME",
+  projectId: "REPLACE_ME",
+  storageBucket: "REPLACE_ME",
+  messagingSenderId: "REPLACE_ME",
+  appId: "REPLACE_ME",
+};
+
+const FIREBASE_ENABLED =
+  typeof firebase !== "undefined" &&
+  FIREBASE_CONFIG.apiKey &&
+  FIREBASE_CONFIG.apiKey !== "REPLACE_ME";
+
+let firebaseDb = null;
+let firebaseUnsubMessages = null;
+let firebaseUnsubProofs = null;
 
 let session = {
   senderName: "",
@@ -23,6 +44,33 @@ let messages = [];
 
 function showView(id) {
   pages.forEach((page) => page.classList.toggle("active", page.id === id));
+}
+
+function setLogoutVisible(isVisible) {
+  if (logoutButton) logoutButton.hidden = !isVisible;
+}
+
+function resetSessionView() {
+  session.senderName = "";
+  session.receiverName = "";
+  session.senderToken = "";
+  session.receiverToken = "";
+  messages = [];
+  senderNameLabel.textContent = "";
+  receiverNameLabel.textContent = "";
+  senderPaneTitle.textContent = "Sender";
+  receiverPaneTitle.textContent = "Receiver";
+  senderLog.innerHTML = "";
+  receiverLog.innerHTML = "";
+  activityListEl.textContent = "No activity yet.";
+  cryptoDetailsEl.textContent =
+    "Cryptography details will appear here after each message.";
+  addStatus("You have been logged out.");
+  setLogoutVisible(false);
+  startForm.reset();
+  senderForm.reset();
+  receiverForm.reset();
+  showView("start");
 }
 
 function b64(buffer) {
@@ -160,6 +208,7 @@ function getUsers() {
 
 function saveUsers(users) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  void mirrorUsersToFirebase(users);
 }
 
 function getMessages() {
@@ -172,6 +221,137 @@ function getMessages() {
 
 function saveMessages(list) {
   localStorage.setItem(MESSAGES_KEY, JSON.stringify(list));
+  void mirrorMessagesToFirebase(list);
+}
+
+function getProofs() {
+  try {
+    return JSON.parse(localStorage.getItem(PROOFS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveProofs(list) {
+  localStorage.setItem(PROOFS_KEY, JSON.stringify(list));
+  void mirrorProofsToFirebase(list);
+}
+
+async function ensureFirebase() {
+  if (!FIREBASE_ENABLED) return null;
+  if (!firebaseDb) {
+    const app = firebase.apps.length
+      ? firebase.app()
+      : firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseDb = app.firestore();
+  }
+  return firebaseDb;
+}
+
+async function mirrorUsersToFirebase(users) {
+  const db = await ensureFirebase();
+  if (!db) return;
+  await Promise.all(
+    Object.entries(users).map(([username, profile]) =>
+      db.collection("users").doc(username).set(profile, { merge: true }),
+    ),
+  );
+}
+
+async function mirrorMessagesToFirebase(list) {
+  const db = await ensureFirebase();
+  if (!db) return;
+  await Promise.all(
+    list.map((item) =>
+      db.collection("messages").doc(item.id).set(item, { merge: true }),
+    ),
+  );
+}
+
+async function mirrorProofsToFirebase(list) {
+  const db = await ensureFirebase();
+  if (!db) return;
+  await Promise.all(
+    list.map((item, index) =>
+      db
+        .collection("proofs")
+        .doc(item.id || `${item.ts || Date.now()}-${index}`)
+        .set(item, { merge: true }),
+    ),
+  );
+}
+
+async function hydrateFromFirebase() {
+  const db = await ensureFirebase();
+  if (!db) return;
+
+  if (!Object.keys(getUsers()).length) {
+    const usersSnap = await db.collection("users").get();
+    const users = {};
+    usersSnap.forEach((doc) => {
+      users[doc.id] = doc.data();
+    });
+    if (Object.keys(users).length) saveUsers(users);
+  }
+
+  if (!getMessages().length) {
+    const msgSnap = await db.collection("messages").orderBy("ts").get();
+    const list = [];
+    msgSnap.forEach((doc) => list.push(doc.data()));
+    if (list.length) saveMessages(list);
+  }
+
+  if (!getProofs().length) {
+    const proofSnap = await db.collection("proofs").orderBy("ts").get();
+    const list = [];
+    proofSnap.forEach((doc) => list.push(doc.data()));
+    if (list.length) saveProofs(list);
+  }
+}
+
+async function attachFirebaseListeners() {
+  const db = await ensureFirebase();
+  if (!db) return;
+
+  if (firebaseUnsubMessages) firebaseUnsubMessages();
+  if (firebaseUnsubProofs) firebaseUnsubProofs();
+
+  firebaseUnsubMessages = db
+    .collection("messages")
+    .orderBy("ts")
+    .onSnapshot((snapshot) => {
+      const current = getMessages();
+      let changed = false;
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== "added") return;
+        const item = change.doc.data();
+        if (!current.some((entry) => entry.id === item.id)) {
+          current.push(item);
+          changed = true;
+        }
+      });
+      if (changed) {
+        saveMessages(current);
+        if (session.senderName && session.receiverName) loadHistory();
+      }
+    });
+
+  firebaseUnsubProofs = db
+    .collection("proofs")
+    .orderBy("ts")
+    .onSnapshot((snapshot) => {
+      const current = getProofs();
+      let changed = false;
+      snapshot.docChanges().forEach((change) => {
+        if (change.type !== "added") return;
+        const item = change.doc.data();
+        if (!current.some((entry) => entry.id === item.id)) {
+          current.push(item);
+          changed = true;
+        }
+      });
+      if (changed) saveProofs(current);
+    });
 }
 
 async function generateUserProfile(username) {
@@ -279,6 +459,9 @@ async function createSession(senderName, receiverName) {
   );
   senderNameLabel.textContent = senderName;
   receiverNameLabel.textContent = receiverName;
+  senderPaneTitle.textContent = senderName;
+  receiverPaneTitle.textContent = receiverName;
+  setLogoutVisible(true);
   addStatus(
     "Secure session created. JWT authentication and encrypted message flow are active.",
   );
@@ -307,18 +490,12 @@ function renderLogs() {
     const senderBubble = document.createElement("div");
     senderBubble.className =
       "bubble " + (item.from === "sender" ? "outgoing" : "incoming");
-    senderBubble.textContent =
-      item.from === "sender"
-        ? `You: ${item.plaintext}`
-        : `${session.receiverName}: ${item.plaintext}`;
+    senderBubble.textContent = item.plaintext;
 
     const receiverBubble = document.createElement("div");
     receiverBubble.className =
       "bubble " + (item.from === "receiver" ? "outgoing" : "incoming");
-    receiverBubble.textContent =
-      item.from === "receiver"
-        ? `You: ${item.plaintext}`
-        : `${session.senderName}: ${item.plaintext}`;
+    receiverBubble.textContent = item.plaintext;
 
     senderLog.appendChild(senderBubble);
     receiverLog.appendChild(receiverBubble);
@@ -450,6 +627,7 @@ async function sendSecureMessage(fromSide, text) {
     from: fromSide,
     sender: fromName,
     recipient: toName,
+    participants: [fromName, toName],
     token,
     iv: encrypted.iv,
     ciphertext: encrypted.ciphertext,
@@ -474,6 +652,20 @@ async function sendSecureMessage(fromSide, text) {
 
   const stored = getMessages();
   saveMessages([...stored, packet]);
+  saveProofs([
+    ...getProofs(),
+    {
+      id: `${packet.id}-send`,
+      type: "send",
+      sender: fromName,
+      recipient: toName,
+      plaintext: text,
+      hash,
+      ciphertext: packet.ciphertext,
+      signature,
+      ts: packet.ts,
+    },
+  ]);
   loadHistory();
   addStatus(`Sent encrypted message from ${fromName} to ${toName}.`);
   renderCryptoDetails({
@@ -537,9 +729,31 @@ async function handleIncomingMessage(packet) {
   if (!stored.some((item) => item.id === packet.id)) {
     saveMessages([
       ...stored,
-      { ...packet, plaintext: decrypted, hash, from: fromSide },
+      {
+        ...packet,
+        participants: [packet.sender, packet.recipient],
+        plaintext: decrypted,
+        hash,
+        from: fromSide,
+      },
     ]);
   }
+
+  saveProofs([
+    ...getProofs(),
+    {
+      id: `${packet.id}-receive`,
+      type: "receive",
+      sender: packet.sender,
+      recipient: packet.recipient,
+      plaintext: decrypted,
+      hash,
+      ciphertext: packet.ciphertext,
+      signature: packet.signature,
+      signatureValid,
+      ts: packet.ts,
+    },
+  ]);
 
   loadHistory();
   addStatus(`Received and verified message from ${packet.sender}.`);
@@ -616,4 +830,14 @@ receiverForm.addEventListener("submit", async (event) => {
   }
 });
 
-showView("start");
+async function initApp() {
+  await hydrateFromFirebase();
+  await attachFirebaseListeners();
+  showView("start");
+}
+
+initApp();
+
+logoutButton.addEventListener("click", () => {
+  resetSessionView();
+});

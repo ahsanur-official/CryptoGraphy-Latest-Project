@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Crypto Chat</title>
     <link rel="stylesheet" href="style.css">
+    <script src="firebase-config.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -17,6 +20,7 @@
               <div class="site-sub">Educational Web Crypto demo</div>
             </div>
           </div>
+          <button id="logoutButton" class="logout-button" type="button" hidden>Logout</button>
         </div>
       </header>
       <main>
@@ -34,10 +38,8 @@
 
         <section id="chat" class="page">
           <div class="chat-header">
-            <div><strong>Sender:</strong> <span
-                id="senderNameLabel"></span></div>
-            <div><strong>Receiver:</strong> <span
-                id="receiverNameLabel"></span></div>
+            <div><strong>Sender:</strong> <span id="senderNameLabel"></span></div>
+            <div><strong>Receiver:</strong> <span id="receiverNameLabel"></span></div>
           </div>
           <div class="status" id="statusMessage">JWT auth, RSA/AES encryption,
             and local DB are enabled.</div>
@@ -49,7 +51,7 @@
             to view send/verification proof details.</div>
           <div class="split-window">
             <div class="pane sender-pane">
-              <h2>Sender</h2>
+              <h2 id="senderPaneTitle">Sender</h2>
               <div class="message-log" id="senderLog"></div>
               <form id="senderForm" class="message-form">
                 <input id="senderMessage" placeholder="Send SMS to receiver"
@@ -58,7 +60,7 @@
               </form>
             </div>
             <div class="pane receiver-pane">
-              <h2>Receiver</h2>
+              <h2 id="receiverPaneTitle">Receiver</h2>
               <div class="message-log" id="receiverLog"></div>
               <form id="receiverForm" class="message-form">
                 <input id="receiverMessage" placeholder="Send SMS to sender"
